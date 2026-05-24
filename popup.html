@@ -103,6 +103,38 @@
 
     #no-price { color: var(--text-dim); font-size: 10px; }
 
+    /* Price drift */
+    #drift-section {
+      background: #0f0f0f;
+      border: 1px solid var(--border-mid);
+      border-top: none;
+      padding: 7px 10px;
+      margin-top: -12px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #drift-label { font-size: 11px; flex: 1; line-height: 1.4; }
+    .drift-was   { font-size: 10px; color: var(--text-dim); margin-left: 4px; }
+
+    #update-price-btn {
+      background: transparent;
+      border: 1px solid var(--border-mid);
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 3px 7px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    #update-price-btn:hover { color: var(--accent); border-color: var(--accent); }
+
     #loading-msg, #error-msg {
       font-size: 11px;
       color: var(--text-dim);
@@ -193,6 +225,11 @@
           <span id="preview-retailer">—</span>
           <span id="preview-price"></span>
         </div>
+      </div>
+
+      <div id="drift-section" style="display:none">
+        <span id="drift-label"></span>
+        <button id="update-price-btn">Update →</button>
       </div>
 
       <div class="field">

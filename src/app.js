@@ -131,6 +131,11 @@ function renderItems(proj, animate) {
   });
 }
 
+function priceAgeDays(item) {
+  if (!item.priceSavedAt || item.price == null) return null;
+  return Math.floor((Date.now() - new Date(item.priceSavedAt)) / 86_400_000);
+}
+
 function buildRow(item) {
   const { url } = buildCheckoutUrl(item);
   // tier is 'product' or 'open' in dashboard phase; 'checkout' is reserved for extension phase
@@ -140,13 +145,18 @@ function buildRow(item) {
     ? item.retailer.replace(/^www\./, '').split('.')[0]
     : '—';
 
+  const age = priceAgeDays(item);
+  const ageHtml = age != null && age > 0
+    ? `<span class="price-age ${age >= 30 ? 'stale' : age >= 7 ? 'aging' : 'fresh'}" title="Price checked ${age}d ago">${age}d</span>`
+    : '';
+
   const row = document.createElement('div');
   row.className = 'item-row';
   row.dataset.status = item.status;
   row.innerHTML = `
     <span class="retailer-tag" title="${esc(item.retailer)}">${esc(retailerShort)}</span>
     <span class="item-title"   title="${esc(item.title)}">${esc(item.title)}</span>
-    <span class="item-price${item.price == null ? ' none' : ''}">${priceText}</span>
+    <span class="item-price${item.price == null ? ' none' : ''}">${priceText}${ageHtml}</span>
     <span class="status-pill ${item.status}">${item.status}</span>
     <div class="item-actions">
       <button class="launch-btn"${!url ? ' disabled' : ''}>${btnLabel}</button>

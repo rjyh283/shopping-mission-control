@@ -47,11 +47,12 @@ function showContent(tab) {
   document.getElementById('loading-msg').style.display = 'none';
   document.getElementById('main-content').style.display = '';
 
-  const retailer = extractRetailer(pageData?.url || tab.url || '');
-  const title    = pageData?.title || tab.title || tab.url || '—';
+  const url      = pageData?.url || tab.url || '';
+  const retailer = extractRetailer(url);
+  const title    = pageData?.title || tab.title || url || '—';
   const price    = pageData?.price ?? null;
 
-  document.getElementById('preview-title').textContent   = title;
+  document.getElementById('preview-title').textContent    = title;
   document.getElementById('preview-retailer').textContent = retailer || '—';
 
   const priceEl = document.getElementById('preview-price');
@@ -60,6 +61,37 @@ function showContent(tab) {
   } else {
     priceEl.innerHTML = '<span id="no-price">no price found</span>';
   }
+
+  // Price drift: check if this page is already saved
+  const match = findSavedMatch(url);
+  if (match && price != null && match.item.price != null) {
+    const delta = price - match.item.price;
+    if (Math.abs(delta) >= 0.01) showDrift(match, delta, price);
+  }
+}
+
+function showDrift(match, delta, currentPrice) {
+  const isDown  = delta < 0;
+  const color   = isDown ? 'var(--green)' : '#ff6b6b';
+  const arrow   = isDown ? '↓' : '↑';
+  const absDelta = Math.abs(delta).toFixed(2);
+
+  document.getElementById('drift-label').innerHTML =
+    `<span style="color:${color}">${arrow} $${absDelta}</span>` +
+    `<span class="drift-was"> · was $${match.item.price.toFixed(2)} in ${esc(match.proj.name)}</span>`;
+
+  const btn = document.getElementById('update-price-btn');
+  btn.onclick = () => updateSavedPrice(match, currentPrice);
+  document.getElementById('drift-section').style.display = '';
+}
+
+async function updateSavedPrice(match, currentPrice) {
+  match.item.price       = currentPrice;
+  match.item.priceSavedAt = new Date().toISOString();
+  await store.set('projects', projects);
+  document.getElementById('drift-section').style.display = 'none';
+  document.getElementById('saved-msg').textContent =
+    `Price updated to $${currentPrice.toFixed(2)}`;
 }
 
 function showError(msg) {
@@ -75,6 +107,24 @@ function extractRetailer(url) {
   } catch (_) {
     return '';
   }
+}
+
+function normalizeUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, '');
+  } catch (_) { return url.trim(); }
+}
+
+function findSavedMatch(url) {
+  const norm = normalizeUrl(url);
+  if (!norm) return null;
+  for (const proj of projects) {
+    for (const item of proj.items) {
+      if (normalizeUrl(item.url) === norm) return { proj, item };
+    }
+  }
+  return null;
 }
 
 async function saveItem() {
@@ -101,6 +151,12 @@ async function saveItem() {
 
   document.getElementById('save-btn').disabled = true;
   document.getElementById('saved-msg').textContent = `Saved to "${proj.name}"`;
+}
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function openDashboard() {
