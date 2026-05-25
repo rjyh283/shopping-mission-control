@@ -29,6 +29,48 @@
     }
   }
 
+  // Parse a price string handling both US ($1,299.99) and EU (1.299,99) formats
+  function parsePrice(text) {
+    const s = String(text ?? '').trim().replace(/[^\d.,]/g, '');
+    if (!s) return null;
+    const lastDot   = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    const norm = lastComma > lastDot
+      ? s.replace(/\./g, '').replace(',', '.')   // EU: comma is decimal
+      : s.replace(/,/g, '');                      // US: dot is decimal
+    const p = parseFloat(norm);
+    return !isNaN(p) && p > 0 ? p : null;
+  }
+
+  // DOM-based price extraction: microdata then Amazon buy-box selectors
+  function extractPriceFromDom() {
+    // schema.org microdata — works on many e-commerce sites
+    for (const micro of document.querySelectorAll('[itemprop="price"]')) {
+      const p = parsePrice(micro.getAttribute('content') || micro.textContent);
+      if (p !== null) return p;
+    }
+
+    // Amazon buy-box — ordered from most to least specific
+    const amazonSelectors = [
+      '.priceToPay .a-offscreen',
+      '#corePriceDisplay_desktop_feature_div .a-offscreen',
+      '#corePrice_feature_div .a-offscreen',
+      '.a-price[data-a-color="base"] .a-offscreen',
+      '#priceblock_ourprice',
+      '#priceblock_dealprice',
+      '#priceblock_saleprice',
+    ];
+    for (const sel of amazonSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const p = parsePrice(el.textContent);
+        if (p !== null) return p;
+      }
+    }
+
+    return null;
+  }
+
   function extractPageData() {
     const ogTitle      = getMetaContent('og:title');
     const twitterTitle = getMetaContent('twitter:title');
@@ -49,19 +91,20 @@
         if (type === 'Product' && node.offers) {
           const offers = Array.isArray(node.offers) ? node.offers : [node.offers];
           for (const offer of offers) {
-            const p = parseFloat(offer?.price);
-            if (!isNaN(p)) { price = p; break; }
+            const p = parsePrice(String(offer?.price ?? ''));
+            if (p !== null) { price = p; break; }
           }
         } else if (type === 'Offer' && node.price != null) {
-          const p = parseFloat(node.price);
-          if (!isNaN(p)) price = p;
+          const p = parsePrice(String(node.price));
+          if (p !== null) price = p;
         }
       });
     });
     if (price === null) {
       const og = getMetaContent('og:price:amount');
-      if (og) { const p = parseFloat(og); if (!isNaN(p)) price = p; }
+      if (og) { const p = parsePrice(og); if (p !== null) price = p; }
     }
+    if (price === null) price = extractPriceFromDom();
 
     // Image: og:image → JSON-LD image
     const ogImage = getMetaContent('og:image');
