@@ -127,6 +127,12 @@ function findSavedMatch(url) {
   return null;
 }
 
+function findItemInProject(proj, url) {
+  const norm = normalizeUrl(url);
+  if (!norm) return null;
+  return proj.items.find(i => normalizeUrl(i.url) === norm) ?? null;
+}
+
 async function saveItem() {
   const projId = document.getElementById('f-project').value;
   const notes  = document.getElementById('f-notes').value.trim();
@@ -135,22 +141,36 @@ async function saveItem() {
 
   const url      = pageData?.url || '';
   const retailer = extractRetailer(url);
+  const existing = url ? findItemInProject(proj, url) : null;
 
-  const item = createItem({
-    title:       pageData?.title || '',
-    url,
-    retailer,
-    price:       pageData?.price ?? null,
-    priceSavedAt: pageData?.price != null ? new Date().toISOString() : null,
-    imageUrl:    pageData?.imageUrl || null,
-    notes,
-  });
-
-  proj.items.push(item);
-  await store.set('projects', projects);
-
-  document.getElementById('save-btn').disabled = true;
-  document.getElementById('saved-msg').textContent = `Saved to "${proj.name}"`;
+  if (existing) {
+    // Update in place — preserve user-set fields (notes, status)
+    if (pageData?.title)    existing.title    = pageData.title;
+    if (pageData?.imageUrl) existing.imageUrl = pageData.imageUrl;
+    if (retailer)           existing.retailer = retailer;
+    if (pageData?.price != null) {
+      existing.price        = pageData.price;
+      existing.priceSavedAt = new Date().toISOString();
+    }
+    await store.set('projects', projects);
+    document.getElementById('save-btn').disabled = true;
+    document.getElementById('drift-section').style.display = 'none';
+    document.getElementById('saved-msg').textContent = `Updated in "${proj.name}"`;
+  } else {
+    const item = createItem({
+      title:        pageData?.title || '',
+      url,
+      retailer,
+      price:        pageData?.price ?? null,
+      priceSavedAt: pageData?.price != null ? new Date().toISOString() : null,
+      imageUrl:     pageData?.imageUrl || null,
+      notes,
+    });
+    proj.items.push(item);
+    await store.set('projects', projects);
+    document.getElementById('save-btn').disabled = true;
+    document.getElementById('saved-msg').textContent = `Saved to "${proj.name}"`;
+  }
 }
 
 function esc(str) {

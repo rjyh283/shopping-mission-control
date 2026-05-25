@@ -199,12 +199,26 @@ function removeItem(itemId) {
   renderPanel(false);
 }
 
+function normalizeUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, '');
+  } catch (_) { return url.trim(); }
+}
+
 function addItem(fields) {
   const proj = activeProject();
-  if (!proj) return;
+  if (!proj) return null;
   let retailer = '';
   if (fields.url) {
     try { retailer = new URL(fields.url).hostname.replace(/^www\./, ''); } catch (_) {}
+  }
+  // Uniqueness: block duplicate URLs within same project
+  if (fields.url) {
+    const norm = normalizeUrl(fields.url);
+    if (proj.items.some(i => i.url && normalizeUrl(i.url) === norm)) {
+      return 'duplicate';
+    }
   }
   const item = createItem({
     ...fields,
@@ -215,6 +229,7 @@ function addItem(fields) {
   persist();
   renderRail();
   renderPanel(false);
+  return 'ok';
 }
 
 // ─── Events ───
@@ -252,6 +267,9 @@ function openModal() {
   ['f-title', 'f-url', 'f-price', 'f-notes'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  const errEl = document.getElementById('modal-error');
+  errEl.textContent = '';
+  errEl.style.display = 'none';
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('f-title').focus();
 }
@@ -268,7 +286,13 @@ function submitModal() {
   const priceNum = priceRaw !== '' ? parseFloat(priceRaw) : null;
   const price    = (priceNum != null && !isNaN(priceNum) && priceNum >= 0) ? priceNum : null;
   const notes    = document.getElementById('f-notes').value.trim();
-  addItem({ title, url, price, notes });
+  const result   = addItem({ title, url, price, notes });
+  if (result === 'duplicate') {
+    const errEl = document.getElementById('modal-error');
+    errEl.textContent = 'This URL is already saved in this project.';
+    errEl.style.display = '';
+    return;
+  }
   closeModal();
 }
 
